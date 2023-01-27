@@ -1,38 +1,51 @@
-node{
-     
-    stage('SCM Checkout'){
-        git url: 'https://github.com/ashokitschool/java_web_docker_app.git',branch: 'master'
+pipeline {
+    agent {
+        label "mynode"
     }
-    
-    stage(" Maven Clean Package"){
-      def mavenHome =  tool name: "Maven-3.5.6", type: "maven"
-      def mavenCMD = "${mavenHome}/bin/mvn"
-      sh "${mavenCMD} clean package"
-      
-    } 
-    
-    
-    stage('Build Docker Image'){
-        sh 'docker build -t dockerhandson/java-web-app .'
-    }
-    
-    stage('Push Docker Image'){
-        withCredentials([string(credentialsId: 'Docker_Hub_Pwd', variable: 'Docker_Hub_Pwd')]) {
-          sh "docker login -u dockerhandson -p ${Docker_Hub_Pwd}"
+    stages {
+        stage("SCM"){
+            steps{
+            git branch: 'main', url: 'https://github.com/Vikash911/Day1.1-jenkins-pipeline-27-01-23-.git'
+                }
         }
-        sh 'docker push dockerhandson/java-web-app'
-     }
-     
-      stage('Run Docker Image In Dev Server'){
+        stage("build by maven"){
+            steps {
+                sh " mvn clean package"
+                    }
+            }
+        stage("building the image with help of docker "){
+            steps{
+                sh "sudo docker build -t myimage:${Image_Version} ." 
+              }
+            }
+        stage("change image name for pushing the image"){
         
-        def dockerRun = ' docker run  -d -p 8080:8080 --name java-web-app dockerhandson/java-web-app'
-         
-         sshagent(['DOCKER_SERVER']) {
-          sh 'ssh -o StrictHostKeyChecking=no ubuntu@172.31.20.72 docker stop java-web-app || true'
-          sh 'ssh  ubuntu@172.31.20.72 docker rm java-web-app || true'
-          sh 'ssh  ubuntu@172.31.20.72 docker rmi -f  $(docker images -q) || true'
-          sh "ssh  ubuntu@172.31.20.72 ${dockerRun}"
-       }
-       
+            steps{
+                withCredentials([string(credentialsId: 'MY_DOCKER_PWD', variable: 'MY_DOCKER_PWD')]) {
+                // some block
+                sh "sudo docker login -u vikash911 -p $MY_DOCKER_PWD "
+                sh "sudo docker tag myimage:${Image_Version} vikash911/myimage:${Image_Version}"
+                }
+                
+            }
+              }
+        stage("push the image to the docker"){
+         steps{
+             sh "sudo docker push vikash911/myimage:${Image_Version}"
+         }
+        }
+        stage("QA testing"){
+            steps{
+            sshagent(['QA_ENV_SSH_CRED']){
+                // some block
+   
+                sh "ssh -o StrictHostKeyChecking=no ec2-user@54.227.177.149 sudo docker run -d -p 8080:8080 --name vo  vikash911/myimage:${Image_Version}"
+		
+            }
+        }
+        
+        }
+     }
     }
-}
+
+
